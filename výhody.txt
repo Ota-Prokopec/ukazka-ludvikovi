@@ -1,0 +1,1 @@
+Je to za buildu, ne při spuštění serveru, takže to může hezky běžet na serverless -> ověřit!
