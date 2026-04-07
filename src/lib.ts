@@ -123,6 +123,24 @@ export const lib = {
       return data;
     }),
 
+  literal: <const T extends string | number | boolean | readonly (string | number | boolean)[]>(value: T) => {
+    // Definice typu pro Inferenci
+    type LiteralType = T extends readonly any[] ? T[number] : T;
+
+    return new CoreField<LiteralType>((data) => {
+      if (Array.isArray(value)) {
+        if (!value.includes(data as any)) {
+          throw new Error(`Expected one of [${value.join(', ')}], but got ${data}`);
+        }
+      } else {
+        if (data !== value) {
+          throw new Error(`Expected exactly ${value}, but got ${data}`);
+        }
+      }
+      return data as LiteralType;
+    });
+  },
+
   boolean: () =>
     new CoreField<boolean>((data) => {
       if (typeof data !== 'boolean') throw new Error('Must be boolean');

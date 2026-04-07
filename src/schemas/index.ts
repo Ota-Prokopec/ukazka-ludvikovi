@@ -22,6 +22,7 @@ export type KeyDefType = {
     id: number;
     username: string;
     contact: ContactDefType;
+    literal: 'active' | 'pending' | 'declined';
 };
 
 export type ContactSchemaType = ContactDefType & {
@@ -71,6 +72,7 @@ export const mySchema = {
         if (typeof data.key.contact !== "object" || data.key.contact === null) throw { path: `mySchema.key.contact`, message: "Musí být objekt" };
         if (!emailValidation(data.key.contact.email)) throw { path: `mySchema.key.contact.email`, message: "Musí být platný email" };
         if (typeof data.key.contact.isActive !== "boolean") throw { path: `mySchema.key.contact.isActive`, message: "Musí být boolean" };
+        if (!['active', 'pending', 'declined'].includes(data.key.literal)) throw { path: `mySchema.key.literal`, message: `Musí být jedna z hodnot: ${['active', 'pending', 'declined'].join(', ')}` };
         if (typeof data.j !== "object" || data.j === null) throw { path: `mySchema.j`, message: "Musí být objekt" };
         if (!Array.isArray(data.j.key)) throw { path: `mySchema.j.key`, message: "Musí být pole" };
         for (let i0 = 0; i0 < data.j.key.length; i0++) {

@@ -13,6 +13,7 @@ const keyDef = lib.object({
   id: lib.number(),
   username: lib.string(),
   contact: contactDef, // Vkládáme definici (plán), nikoliv zkompilované schéma!
+  literal: lib.literal(['active', 'pending', 'declined']),
 });
 
 // 3. A nakonec zkompiluješ to velké, hlavní schéma

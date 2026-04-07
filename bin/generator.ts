@@ -17,6 +17,31 @@ export function generateTypeScriptType(node: Node): string {
   if (text.startsWith('lib.number')) return 'number';
   if (text.startsWith('lib.boolean')) return 'boolean';
 
+  // V generateTypeScriptType(node: Node) přidejte:
+  if (text.startsWith('lib.literal')) {
+    const arg = (node as any).getArguments()[0];
+    const type = arg.getType();
+
+    // 1. Pokud je to pole přímo v kódu: lib.literal([1, 2])
+    if (Node.isArrayLiteralExpression(arg)) {
+      return arg
+        .getElements()
+        .map((el) => el.getText())
+        .join(' | ');
+    }
+
+    // 2. Pokud je to Union typ odjinud (např. importované Enum/Union)
+    if (type.isUnion()) {
+      return type
+        .getUnionTypes()
+        .map((t) => t.getText())
+        .join(' | ');
+    }
+
+    // 3. Klasický jeden literál
+    return type.getText();
+  }
+
   if (Node.isCallExpression(node)) {
     const expression = node.getExpression();
     const name = Node.isPropertyAccessExpression(expression) ? expression.getName() : expression.getText();
@@ -205,6 +230,32 @@ export function generateValidationCode(node: Node, varPath: string, errorPath: s
     const emailMatch = text.match(/lib\.email\(([^)]*)\)/);
     const errorMsg = emailMatch && emailMatch[1]?.trim() ? emailMatch[1].trim() : `"Musí být platný email"`;
     return `    if (!emailValidation(${varPath})) throw { path: \`${errorPath}\`, message: ${errorMsg} };\n`;
+  }
+
+  // V generateValidationCode(node: Node, varPath: string, errorPath: string, ctx: GenerationContext)
+
+  if (text.startsWith('lib.literal')) {
+    const arg = (node as any).getArguments()[0];
+    const type = arg.getType();
+
+    let valuesText: string;
+
+    if (Node.isArrayLiteralExpression(arg)) {
+      // Případ lib.literal([1, 2])
+      valuesText = arg.getText(); // Vrátí přímo "[1, 2]"
+    } else if (type.isUnion()) {
+      // Případ importované proměnné, která je union
+      valuesText = `[${type
+        .getUnionTypes()
+        .map((t) => t.getText())
+        .join(', ')}]`;
+    } else {
+      // Klasický jeden literál
+      const val = type.getText();
+      return `    if (${varPath} !== ${val}) throw { path: \`${errorPath}\`, message: \`Musí být přesně \${${val}}\` };\n`;
+    }
+
+    return `    if (!${valuesText}.includes(${varPath})) throw { path: \`${errorPath}\`, message: \`Musí být jedna z hodnot: \${${valuesText}.join(', ')}\` };\n`;
   }
 
   if (Node.isCallExpression(node)) {
