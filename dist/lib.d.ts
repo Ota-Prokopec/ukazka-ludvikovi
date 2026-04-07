@@ -18,7 +18,7 @@ export type CompiledSchema<T> = {
     };
 } : {});
 declare class CoreField<T, S extends boolean = false> implements Field<T, S> {
-    protected parserFn: (data: unknown) => T;
+    parserFn: (data: unknown) => T;
     _type: T;
     _standalone: S;
     isStandalone: boolean;
@@ -31,6 +31,7 @@ export declare class ObjectField<Shape extends Record<string, Field<any, any>>, 
 }, S> {
     shape: Shape;
     constructor(shape: Shape);
+    extend<NewShape extends Record<string, any>>(newShape: NewShape): ObjectField<Shape & NewShape, false>;
     standalone(): ObjectField<Shape, true>;
 }
 export declare class ArrayField<Inner extends Field<any, any>, S extends boolean = false> extends CoreField<Array<Inner['_type']>, S> {
@@ -39,7 +40,10 @@ export declare class ArrayField<Inner extends Field<any, any>, S extends boolean
     standalone(): ArrayField<Inner, true>;
 }
 export declare const lib: {
-    string: () => CoreField<string, false>;
+    string: (options?: {
+        regex?: RegExp;
+        message?: string;
+    }) => CoreField<string, false>;
     number: () => CoreField<number, false>;
     boolean: () => CoreField<boolean, false>;
     email: (msg?: string) => CoreField<string, false>;

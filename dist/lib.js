@@ -32,6 +32,10 @@ export class ObjectField extends CoreField {
         });
         this.shape = shape;
     }
+    extend(newShape) {
+        // Vytvoříme novou instanci ObjectField, která obsahuje vlastnosti obou
+        return new ObjectField({ ...this.shape, ...newShape });
+    }
     standalone() {
         this.isStandalone = true;
         return this;
@@ -61,9 +65,12 @@ export class ArrayField extends CoreField {
 // 3. VEŘEJNÉ API (TO, CO IMPORTUJE VÝVOJÁŘ)
 // ==========================================
 export const lib = {
-    string: () => new CoreField((data) => {
+    string: (options) => new CoreField((data) => {
         if (typeof data !== 'string')
             throw new Error(data + 'Must be string');
+        if (options?.regex && !options.regex.test(data)) {
+            throw new Error(options.message || 'Invalid string format');
+        }
         return data;
     }),
     number: () => new CoreField((data) => {

@@ -1,57 +1,57 @@
 import { emailValidation } from "./helpers/emailValidation.js";
+import { contactDef } from './a.js';
 import { lib } from './lib.js';
-const schema = {
+// (Volitelné) Pokud potřebuješ validovat kontakty i samostatně,
+// vytvoříš si pro ně zkompilovaný validátor bokem:
+const contactSchema = {
     parse: (data) => {
         if (typeof data !== "object" || data === null)
             throw new Error(`root musí být objekt`);
-        if (typeof data.id !== "string")
-            throw new Error(`id musí být string`);
         if (!emailValidation(data.email))
-            throw new Error('Zadej platný mail');
-        if (!Array.isArray(data.tags))
-            throw new Error(`tags musí být pole`);
-        for (let i0 = 0; i0 < data.tags.length; i0++) {
-            const item_i0 = data.tags[i0];
-            if (typeof item_i0 !== "object" || item_i0 === null)
-                throw new Error(`tags[${i0}] musí být objekt`);
-            if (!Array.isArray(item_i0.tags))
-                throw new Error(`tags[${i0}].tags musí být pole`);
-            for (let i1 = 0; i1 < item_i0.tags.length; i1++) {
-                const item_i1 = item_i0.tags[i1];
-                if (typeof item_i1 !== "object" || item_i1 === null)
-                    throw new Error(`tags[${i0}].tags[${i1}] musí být objekt`);
-                if (typeof item_i1.tag !== "string")
-                    throw new Error(`tags[${i0}].tags[${i1}].tag musí být string`);
-            }
-        }
-        if (typeof File === "undefined" || !(data.profilePicture instanceof File))
-            throw new Error(`
-      Nahraný dokument musí
-       být validní soubor!
-       
-       `);
+            throw new Error(`email musí být platný email`);
+        if (typeof data.isActive !== "boolean")
+            throw new Error(`isActive musí být boolean`);
+        if (typeof data.a !== "number")
+            throw new Error(`a musí být číslo`);
         return data;
-    },
-    fields: {
-        email: {
-            parse: (data) => {
-                if (!emailValidation(data))
-                    throw new Error('Zadej platný mail');
-                return data;
-            }
-        },
     }
 };
-const neznamaData = {
-    id: 'a',
-    email: 'test@test.com',
-    tags: [{ tags: [{ tag: 'my tag' }] }],
-    profilePicture: new File([], ''),
+const contactSchema2 = {
+    parse: (data) => {
+        if (typeof data !== "object" || data === null)
+            throw new Error(`root musí být objekt`);
+        if (!emailValidation(data.email))
+            throw new Error(`email musí být platný email`);
+        if (typeof data.isActive !== "boolean")
+            throw new Error(`isActive musí být boolean`);
+        return data;
+    }
 };
-// ✅ 1. Zkontroluje a vrátí PŘESNÝ typ se všemi properties!
-const data = schema.parse(neznamaData);
-// data.id (string)
-// data.email (string)
-// data.tags (string[])
-console.dir(data, { depth: null });
+// 2. Tuto surovou strukturu použiješ jako stavební kámen jinde
+const keyDef = lib.object({
+    id: lib.number(),
+    username: lib.string(),
+    contact: contactDef, // Vkládáme definici (plán), nikoliv zkompilované schéma!
+});
+// 3. A nakonec zkompiluješ to velké, hlavní schéma
+const mySchema = {
+    parse: (data) => {
+        if (typeof data !== "object" || data === null)
+            throw new Error(`root musí být objekt`);
+        if (typeof data.key !== "object" || data.key === null)
+            throw new Error(`key musí být objekt`);
+        if (typeof data.key.id !== "number")
+            throw new Error(`key.id musí být číslo`);
+        if (typeof data.key.username !== "string")
+            throw new Error(`key.username musí být string`);
+        if (typeof data.key.contact !== "object" || data.key.contact === null)
+            throw new Error(`key.contact musí být objekt`);
+        if (!emailValidation(data.key.contact.email))
+            throw new Error(`key.contact.email musí být platný email`);
+        if (typeof data.key.contact.isActive !== "boolean")
+            throw new Error(`key.contact.isActive musí být boolean`);
+        return data;
+    }
+};
+console.log(mySchema.parse({ key: { id: 1, username: 'fda', contact: { email: 'a@a.a', isActive: true } } }));
 //# sourceMappingURL=index.js.map

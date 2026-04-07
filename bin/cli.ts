@@ -3,6 +3,7 @@ import { Project } from 'ts-morph';
 import path from 'path';
 import { readFileSync } from 'fs';
 import { transformSourceFile } from './transformer';
+import typiaTransform from 'typia/lib/transform';
 
 console.log('🚀 Spouštím AOT kompilaci projektu...\n');
 
@@ -31,6 +32,8 @@ let transformedFilesCount = 0;
 
 sourceFiles.forEach((sourceFile) => {
   const filePath = sourceFile.getFilePath();
+  console.log(`filePath: ${filePath}`);
+
   const rawText = readFileSync(filePath, 'utf-8');
 
   // Textový filtr - extrémně urychlí průchod velkým projektem
@@ -49,6 +52,17 @@ sourceFiles.forEach((sourceFile) => {
 
 console.log(`\n⚙️ Transformace dokončeny (${transformedFilesCount} souborů upraveno). Kompiluji do JavaScriptu...`);
 
-const emitResult = project.emitSync();
+const emitResult = project.emitSync({
+  customTransformers: { before: [typiaTransform(project.getProgram().compilerObject)] },
+});
+
+if (emitResult.getEmitSkipped()) {
+  console.error('❌ Emit failed!');
+  const diagnostics = emitResult.getDiagnostics();
+  if (diagnostics.length > 0) {
+    console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
+  }
+  process.exit(1);
+}
 
 console.log('🎉 Build úspěšně dokončen!');

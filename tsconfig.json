@@ -22,8 +22,15 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
 
-    "noEmitOnError": true
+    "noEmitOnError": true,
+
+    // Typia transformer configuration
+    "plugins": [
+      {
+        "transform": "typia/lib/transform"
+      }
+    ]
   },
-  "include": ["src"],
+  "include": ["src", "node_modules/a/index.ts"],
   "exclude": ["node_modules"]
 }

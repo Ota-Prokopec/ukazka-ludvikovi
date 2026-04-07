@@ -1,32 +1,24 @@
-import { lib, type Infer } from './lib.js';
+import { contactDef } from './a.js';
+import { lib } from './lib.js';
 
-const schema = lib.compile(
+// (Volitelné) Pokud potřebuješ validovat kontakty i samostatně,
+// vytvoříš si pro ně zkompilovaný validátor bokem:
+
+const contactSchema = lib.compile(contactDef.extend({ a: lib.number() }));
+const contactSchema2 = lib.compile(contactDef);
+
+// 2. Tuto surovou strukturu použiješ jako stavební kámen jinde
+const keyDef = lib.object({
+  id: lib.number(),
+  username: lib.string(),
+  contact: contactDef, // Vkládáme definici (plán), nikoliv zkompilované schéma!
+});
+
+// 3. A nakonec zkompiluješ to velké, hlavní schéma
+const mySchema = lib.compile(
   lib.object({
-    id: lib.string(), // Není standalone
-    email: lib.email('Zadej platný mail').standalone(), // JE standalone
-    tags: lib.array(lib.object({ tags: lib.array(lib.object({ tag: lib.string() })) })), // Zanořené pole
-    profilePicture: lib.file(`
-      Nahraný dokument musí
-       být validní soubor!
-       
-       `),
+    key: keyDef,
   }),
 );
-type Data = Infer<typeof schema>;
 
-type Email = Infer<typeof schema.fields.email>;
-
-const neznamaData: Data = {
-  id: 'a',
-  email: 'test@test.com',
-  tags: [{ tags: [{ tag: 'my tag' }] }],
-  profilePicture: new File([], ''),
-};
-
-// ✅ 1. Zkontroluje a vrátí PŘESNÝ typ se všemi properties!
-const data = schema.parse(neznamaData);
-// data.id (string)
-// data.email (string)
-// data.tags (string[])
-
-console.dir(data, { depth: null });
+console.log(mySchema.parse({ key: { id: 1, username: 'fda', contact: { email: 'a@a.a', isActive: true } } }));

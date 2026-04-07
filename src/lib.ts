@@ -42,7 +42,7 @@ class CoreField<T, S extends boolean = false> implements Field<T, S> {
   declare _standalone: S;
   public isStandalone = false;
 
-  constructor(protected parserFn: (data: unknown) => T) {}
+  constructor(public parserFn: (data: unknown) => T) {}
 
   standalone(): CoreField<T, true> {
     this.isStandalone = true;
@@ -68,6 +68,11 @@ export class ObjectField<Shape extends Record<string, Field<any, any>>, S extend
       }
       return result;
     });
+  }
+
+  public extend<NewShape extends Record<string, any>>(newShape: NewShape) {
+    // Vytvoříme novou instanci ObjectField, která obsahuje vlastnosti obou
+    return new ObjectField({ ...this.shape, ...newShape });
   }
 
   standalone(): ObjectField<Shape, true> {
@@ -103,9 +108,12 @@ export class ArrayField<Inner extends Field<any, any>, S extends boolean = false
 // ==========================================
 
 export const lib = {
-  string: () =>
+  string: (options?: { regex?: RegExp; message?: string }) =>
     new CoreField<string>((data) => {
       if (typeof data !== 'string') throw new Error(data + 'Must be string');
+      if (options?.regex && !options.regex.test(data)) {
+        throw new Error(options.message || 'Invalid string format');
+      }
       return data;
     }),
 
