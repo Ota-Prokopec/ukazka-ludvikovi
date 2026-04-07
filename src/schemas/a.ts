@@ -1,4 +1,4 @@
-import { lib } from './lib.js';
+import { lib } from '../lib.js';
 
 // 1. Zadefinuješ si "surovou" strukturu (bez lib.compile!)
 export const contactDef = lib.object({

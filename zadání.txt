@@ -1,0 +1,8 @@
+Vytvořit AOT validační knihovnu,
+bude validovat pouze základní typy (tyto typy zde vyčtu):
+string, number, boolean, file, email, null, undefined, object, array (pouze itemů jednoho typu, tedy nikoliv (string|number)[])
+Kompilace bude probíhat pomocí CLI příkazu. validační schémata se budou psát do jedné složky (např: /schemas/*.ts) a budou se pomocí CLI komandu zapisovat zpět do /schemas/index.ts (Embedded DSL)
+Kompilace bude využívat ts-morph a bude kompilovat pouze tu složku /schemas/*.ts, ostatní soubory aplikace (backendu) se budou kompilovat pomocí kompilátoru třetí strany (tedy kompilátoru určeného pro právě ten backend framework).
+
+Co musí být a ještě jsem neudělal?
+optinal parametry

@@ -1,11 +1,9 @@
-// src/cli.ts
 import { Project } from 'ts-morph';
 import path from 'path';
 import { readFileSync } from 'fs';
-import { transformSourceFile } from './transformer';
-import typiaTransform from 'typia/lib/transform';
+import { extractFromSourceFile } from './transformer';
 
-console.log('🚀 Spouštím AOT kompilaci projektu...\n');
+console.log('🚀 Spouštím AOT generování TypeScript schémat...\n');
 
 const tsConfigFilePath = path.join(process.cwd(), 'tsconfig.json');
 const project = new Project({
@@ -13,56 +11,55 @@ const project = new Project({
   skipAddingFilesFromTsConfig: false,
 });
 
-const sourceFiles = project.getSourceFiles();
+const sourceFiles = project.addSourceFilesAtPaths('src/schemas/!(index).ts');
 console.log(`📁 Nalezeno ${sourceFiles.length} souborů ke kontrole.`);
 
-// --- PŘIDÁNO: STRIKTNÍ TYPOVÁ KONTROLA PŘED KOMPILACÍ ---
-console.log('🔍 Provádím Type-checking projektu...');
-const preEmitDiagnostics = project.getPreEmitDiagnostics();
-
-if (preEmitDiagnostics.length > 0) {
-  console.error('\n❌ Kompilace zastavena! Nalezeny chyby TypeScriptu:');
-  // Toto vypíše chyby úplně stejně hezky barevně jako nativní 'tsc'
-  console.log(project.formatDiagnosticsWithColorAndContext(preEmitDiagnostics));
-  process.exit(1); // Ukončí proces s chybou (nepustí build dál)
-}
-console.log('✅ Typy jsou v pořádku. Spouštím AOT transformace...\n');
-
 let transformedFilesCount = 0;
+let globalUsesEmailValidation = false;
+let finalIndexContent = '';
 
 sourceFiles.forEach((sourceFile) => {
   const filePath = sourceFile.getFilePath();
-  console.log(`filePath: ${filePath}`);
-
   const rawText = readFileSync(filePath, 'utf-8');
 
-  // Textový filtr - extrémně urychlí průchod velkým projektem
-  if (!rawText.includes('lib.compile')) {
+  // Zkontrolujeme, zda má smysl do souboru vůbec koukat (zda obsahuje lib.)
+  if (!rawText.includes('lib.')) {
     return;
   }
 
-  // Zavoláme oddělenou transformační logiku
-  const wasTransformed = transformSourceFile(sourceFile);
+  const result = extractFromSourceFile(sourceFile);
 
-  if (wasTransformed) {
+  // Pokud jsme našli jakékoliv typy nebo kompilovaná schémata
+  if (result.schemas.length > 0 || result.types.length > 0) {
     transformedFilesCount++;
-    console.log(`✅ Ztransformováno: ${sourceFile.getBaseName()}`);
+    if (result.usesEmailValidation) globalUsesEmailValidation = true;
+
+    // Nejdříve do indexu nasypeme ZÁKLADNÍ TYPY (např. ContactDefType)
+    result.types.forEach((t) => {
+      finalIndexContent += `export type ${t.typeName} = ${t.typeDef};\n\n`;
+    });
+
+    // A následně KOMPILOVANÁ SCHÉMATA (např. ContactSchemaType a contactSchema)
+    result.schemas.forEach((schema) => {
+      finalIndexContent += `export type ${schema.typeName} = ${schema.typeDef};\n\n`;
+      finalIndexContent += `export const ${schema.varName} = ${schema.validationCode};\n\n`;
+    });
+
+    console.log(`✅ Zpracováno do paměti z: ${sourceFile.getBaseName()}`);
   }
 });
 
-console.log(`\n⚙️ Transformace dokončeny (${transformedFilesCount} souborů upraveno). Kompiluji do JavaScriptu...`);
+// --- VYTVOŘENÍ A EXPORT INDEXU ---
+console.log(`\n⚙️ Vytvářím výsledný src/schemas/index.ts...`);
 
-const emitResult = project.emitSync({
-  customTransformers: { before: [typiaTransform(project.getProgram().compilerObject)] },
-});
+const importStr = globalUsesEmailValidation
+  ? `import { emailValidation } from "../helpers/emailValidation.js";\n\n`
+  : '';
 
-if (emitResult.getEmitSkipped()) {
-  console.error('❌ Emit failed!');
-  const diagnostics = emitResult.getDiagnostics();
-  if (diagnostics.length > 0) {
-    console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
-  }
-  process.exit(1);
-}
+const indexFile = project.createSourceFile('src/schemas/index.ts', importStr + finalIndexContent, { overwrite: true });
+indexFile.formatText();
+indexFile.saveSync();
 
-console.log('🎉 Build úspěšně dokončen!');
+console.log(
+  `🎉 Build úspěšně dokončen! Zpracováno ${transformedFilesCount} souborů a výsledek zapsán do src/schemas/index.ts.`,
+);

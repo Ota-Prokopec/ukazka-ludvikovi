@@ -1,10 +1,11 @@
 import { contactDef } from './a.js';
-import { lib } from './lib.js';
+import { lib } from '../lib.js';
+import { sch } from './i.js';
 
 // (Volitelné) Pokud potřebuješ validovat kontakty i samostatně,
 // vytvoříš si pro ně zkompilovaný validátor bokem:
 
-const contactSchema = lib.compile(contactDef.extend({ a: lib.number() }));
+const contactSchema = lib.compile(contactDef.extend({ a: lib.number().standalone() }));
 const contactSchema2 = lib.compile(contactDef);
 
 // 2. Tuto surovou strukturu použiješ jako stavební kámen jinde
@@ -18,6 +19,7 @@ const keyDef = lib.object({
 const mySchema = lib.compile(
   lib.object({
     key: keyDef,
+    j: sch,
   }),
 );
 

@@ -1,69 +1,79 @@
-// src/transformer.ts
-import { SourceFile, SyntaxKind, CallExpression, Node } from 'ts-morph';
-import { generateValidationCode, GenerationContext } from './generator';
+import { SourceFile, SyntaxKind, Node, VariableDeclaration } from 'ts-morph';
+import {
+  generateValidationCode,
+  generateTypeScriptType,
+  extractStandaloneFields,
+  GenerationContext,
+} from './generator';
 
-export function transformSourceFile(sourceFile: SourceFile): boolean {
-  let hasTransformations = false;
+export interface ExtractedType {
+  typeName: string;
+  typeDef: string;
+}
 
-  // Inicializujeme kontext pro tento konkrétní soubor
-  const ctx: GenerationContext = {
-    loopId: 0,
-    usesEmailValidation: false,
-  };
+export interface ExtractedSchema {
+  varName: string;
+  typeName: string;
+  typeDef: string;
+  validationCode: string;
+}
 
-  const callExpressions = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression);
+export interface TransformResult {
+  schemas: ExtractedSchema[];
+  types: ExtractedType[];
+  usesEmailValidation: boolean;
+}
 
-  callExpressions.forEach((callExpr: CallExpression) => {
-    if (callExpr.wasForgotten()) return;
+export function extractFromSourceFile(sourceFile: SourceFile): TransformResult {
+  const result: TransformResult = { schemas: [], types: [], usesEmailValidation: false };
+  const ctx: GenerationContext = { loopId: 0, usesEmailValidation: false };
 
-    if (callExpr.getExpression().getText() === 'lib.compile') {
-      const rootSchemaNode = callExpr.getArguments()[0];
-      if (!rootSchemaNode) return;
+  const varDecls = sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration);
 
-      // Generování hlavní validace
-      const mainConditions = generateValidationCode(rootSchemaNode, 'data', 'root', ctx);
-      let fieldsCode = '';
+  varDecls.forEach((varDecl: VariableDeclaration) => {
+    const initializer = varDecl.getInitializer();
+    if (!initializer) return;
 
-      // Extrakce .standalone() vlastností
-      if (Node.isCallExpression(rootSchemaNode) && rootSchemaNode.getExpression().getText() === 'lib.object') {
-        const objLiteral = rootSchemaNode.getArguments()[0];
-        if (Node.isObjectLiteralExpression(objLiteral)) {
-          objLiteral.getProperties().forEach((prop) => {
-            if (Node.isPropertyAssignment(prop)) {
-              const key = prop.getName();
-              const initializer = prop.getInitializer()!;
+    if (Node.isCallExpression(initializer)) {
+      const expressionText = initializer.getExpression().getText();
 
-              if (initializer.getText().includes('.standalone()')) {
-                // Generujeme kód izolovaně jen pro tuto vlastnost
-                const standaloneValidation = generateValidationCode(initializer, 'data', key, ctx).trim();
-                fieldsCode += `\n    ${key}: {\n      parse: (data: any) => {\n    ${standaloneValidation}\n        return data;\n      }\n    },`;
-              }
-            }
-          });
-        }
-      }
+      if (expressionText.startsWith('lib.')) {
+        const varName = varDecl.getName();
+        const typeName = varName.charAt(0).toUpperCase() + varName.slice(1) + 'Type';
 
-      // Sestavení a nahrazení AST uzlu
-      const generatedCode = `{
-  parse: (data: any) => {
-${mainConditions}    return data;
+        if (expressionText === 'lib.compile') {
+          const rootSchemaNode = initializer.getArguments()[0];
+          if (!rootSchemaNode) return;
+
+          const typeString = generateTypeScriptType(rootSchemaNode);
+
+          // ZMĚNA: Předáváme 'varName' (např. mySchema) místo 'root'
+          const mainConditions: string = generateValidationCode(rootSchemaNode, 'data', varName, ctx);
+          const fieldsCode = extractStandaloneFields(rootSchemaNode, varName, ctx);
+
+          const generatedCode = `{
+    parse: (data: any) => {
+      ${mainConditions}    return data;
   }${fieldsCode !== '' ? `,\n  fields: {${fieldsCode}\n  }` : ''}
 }`;
 
-      callExpr.replaceWithText(generatedCode);
-      hasTransformations = true;
+          result.schemas.push({
+            varName,
+            typeName,
+            typeDef: typeString,
+            validationCode: generatedCode,
+          });
+        } else {
+          const typeString = generateTypeScriptType(initializer);
+          result.types.push({
+            typeName,
+            typeDef: typeString,
+          });
+        }
+      }
     }
   });
 
-  // Přidání importů, pokud to kontext vyžaduje
-  if (hasTransformations && ctx.usesEmailValidation) {
-    const existingImport = sourceFile.getImportDeclaration(
-      (decl) => decl.getModuleSpecifierValue() === './helpers/emailValidation.js',
-    );
-    if (!existingImport) {
-      sourceFile.insertStatements(0, `import { emailValidation } from "./helpers/emailValidation.js";`);
-    }
-  }
-
-  return hasTransformations;
+  result.usesEmailValidation = ctx.usesEmailValidation;
+  return result;
 }
